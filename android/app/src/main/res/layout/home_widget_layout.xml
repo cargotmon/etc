@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="12dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:background="@drawable/widget_bg_alert">
+    <!--android:backgroundAlpha="0.5"-->
+    <!-- widget_background -->
+
+    <TextView
+        android:id="@+id/med_time"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:text="로딩중!"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="@android:color/white" />
+</RelativeLayout>
