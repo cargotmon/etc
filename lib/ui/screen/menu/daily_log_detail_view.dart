@@ -1,4 +1,5 @@
 import 'package:etc/ui/screen/chagebu/car_efficiency_view.dart';
+import 'package:etc/ui/screen/items/item_list_screen.dart';
 import 'package:etc/ui/screen/verbs/verb_study_view.dart';
 import 'package:flutter/material.dart';
 //import 'package:dlog/money/money_dal_view.dart';
@@ -23,7 +24,7 @@ class DailyLogDetailArea extends StatelessWidget {
       case 1: return const VerbStudyView();
       case 2: return const Center(child: Text("갤러리 준비 중..."));
       case 3: return const CarEfficiencyView();
-      //case 5: return const ItemListScreen();
+      case 5: return const ItemListScreen();
       default: return Center(child: Text("$index번 상세 내용... 🚧"));
     }
   }

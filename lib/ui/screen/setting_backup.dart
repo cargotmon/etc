@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:etc/server/control/database_helper.dart';
-import 'package:etc/ui/screen/setting/tile_config_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -33,44 +32,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadBackupHistory();
   }
 
-  Widget _buildDashboardSettingTile(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        leading: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: Colors.pinkAccent.withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.dashboard_customize_rounded, color: Colors.pinkAccent),
-        ),
-        title: const Text(
-          "대시보드 타일 설정",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        subtitle: const Text(
-          "타일 노출 여부 및 순서를 변경합니다.",
-          style: TextStyle(color: Colors.white38, fontSize: 12),
-        ),
-        trailing: const Icon(Icons.chevron_right, color: Colors.white24),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const TileConfigScreen()),
-          );
-        },
-      ),
-    );
-  }
-
-
   // 1. 백업 목록 불러오기
   Future<void> _loadBackupHistory() async {
     if (!mounted) return;
@@ -80,6 +41,117 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() => _backupFiles = files);
     } catch (e) {
       debugPrint("백업 목록 로드 실패: $e");
+    } finally {
+      if (mounted) setState(() => _isSyncing = false);
+    }
+  }
+
+
+  Future<void> _handleBackupMariaToLocal() async {
+    // 1. 로딩 표시 (선택 사항)
+    debugPrint("🚀 MariaDB -> 로컬 SQLite 마이그레이션 시작...");
+
+    try {
+      // 2. PHP 서버 호출 (본인 서버 URL로 수정 필수)
+      //                  https://lsj.kr/nexa/get_all_daily_logs.php?userid=coxycat@naver.com
+      final String url = "https://lsj.kr/nexa/get_all_daily_logs.php?userid=coxycat@naver.com";
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
+
+        if (jsonResponse['ErrorCode'] == 0) {
+          List<dynamic> serverLogs = jsonResponse['data'];
+          final db = await DatabaseHelper.instance.database;
+
+          // 3. 트랜잭션을 사용하여 데이터 무결성 및 속도 확보 [sqflite Transaction](https://pub.dev)
+          await db.transaction((txn) async {
+            for (var log in serverLogs) {
+              String logUuid = log['uuid'] ?? const Uuid().v4();
+
+              // 💡 MariaDB의 med_time 문자열(예: '6:35~ 12:35')을 SQLite 컬럼에 분배
+              List<String> times = (log['med_time'] ?? "").toString().split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
+
+              // 4. 메인 로그 저장 (daily_logs)
+              await txn.insert(
+                'daily_logs',
+                {
+                  'uuid': logUuid,
+                  //'userid': log['userid'],
+                  'userid': "cargotmon@gmail.com",
+                  'date': log['date'], // MariaDB의 'day' 컬럼
+                  'memo': log['memo'],
+                  'med_time1': times.isNotEmpty ? times[0] : null,
+                  'med_time2': times.length > 1 ? times[1] : null,
+                  'med_time3': times.length > 2 ? times[2] : null,
+                  'weather': log['weather'],
+                  'mood': log['mood'],
+                },
+                conflictAlgorithm: ConflictAlgorithm.replace, // 💡 중복 시 덮어쓰기 (Merge)
+              );
+
+              // 5. 지출 상세 내역 분리 저장 (expenses 테이블)
+              if (log['expense_data'] != null && log['expense_data'].toString().isNotEmpty) {
+                // 기존 해당 UUID의 지출 데이터 삭제 후 재삽입
+                await txn.delete('expenses', where: 'log_uuid = ?', whereArgs: [logUuid]);
+
+                try {
+                  List<dynamic> expenseList = jsonDecode(log['expense_data']);
+                  for (var exp in expenseList) {
+                    await txn.insert('expenses', {
+                      'log_uuid': logUuid,
+                      'item': exp['item'],
+                      'price': int.tryParse(exp['price'].toString()) ?? 0,
+                    });
+                  }
+                } catch (e) {
+                  debugPrint("❌ 지출 데이터 파싱 에러 (날짜: ${log['date']}): $e");
+                }
+              }
+            }
+          });
+
+          debugPrint("✅ 마이그레이션 완료: ${serverLogs.length}건 처리됨");
+
+          // 6. UI 갱신 (현재 화면의 데이터를 다시 불러오는 함수 호출)
+          if (mounted) {
+            setState(() {
+              // _loadLocalData(); // 로컬 DB에서 다시 읽어오는 로직 실행
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text("${serverLogs.length}건의 데이터를 가져왔습니다.")),
+            );
+          }
+        }
+      } else {
+        throw Exception("서버 응답 에러: ${response.statusCode}");
+      }
+    } catch (e) {
+      debugPrint("❌ 마이그레이션 중 오류 발생: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("데이터를 가져오는 중 오류가 발생했습니다.")),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleBackupToMaria() async {
+    setState(() => _isSyncing = true);
+    try {
+      await _service.runDbBackup();
+      await _loadBackupHistory();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("✅ 구글 드라이브 백업 완료!"))
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("❌ 백업 실패: $e"))
+        );
+      }
     } finally {
       if (mounted) setState(() => _isSyncing = false);
     }
@@ -180,7 +252,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             style: const TextStyle(color: Colors.white),
             decoration: _buildInputDecoration("이메일 주소 (ID)", Icons.email),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 20),
           ElevatedButton(
             onPressed: () async {
               try {
@@ -205,41 +277,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: const Text("기본 설정 저장", style: TextStyle(color: Colors.white)),
           ),
 
-          const Divider(height: 10, color: Colors.white24),
+          // const Divider(height: 60, color: Colors.white24),
+          //
+          // _buildSectionTitle("마리아서버"),
+          // _isSyncing
+          //     ? const Center(child: Padding(padding: EdgeInsets.all(10), child: CircularProgressIndicator()))
+          //     : ElevatedButton.icon(
+          //   onPressed: _handleBackupMariaToLocal,
+          //   icon: const Icon(Icons.cloud_download),
+          //   label: const Text("maria to local"),
+          //   style: ElevatedButton.styleFrom(backgroundColor: Colors.brown),
+          // ),
+          // _isSyncing
+          //     ? const Center(child: Padding(padding: EdgeInsets.all(10), child: CircularProgressIndicator()))
+          //     : ElevatedButton.icon(
+          //   onPressed: _handleBackupToMaria,
+          //   icon: const Icon(Icons.cloud_upload),
+          //   label: const Text("local => maria"),
+          //   style: ElevatedButton.styleFrom(backgroundColor: Colors.blueGrey.shade700),
+          // ),
 
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                //handleSignOut();
-                //bool isSuccess = await _service.restoreDatabaseFromDrive(fileId: fileId);
-                await _service.logOut();
-
-                debugPrint("로그 아웃 성공!"); // 로그 확인용
-              } catch (e) {
-
-                debugPrint("로그 아웃 중 에러 발생: $e");
-                // 에러가 나도 화면을 넘길지, 여기서 멈출지 결정
-              }
-
-              if (mounted) {
-                // 💡 첫 방문 여부와 상관없이 무조건 대시보드로 이동하게 수정
-                debugPrint('gogo dash board');
-                Navigator.pushReplacementNamed(context, '/');
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.pinkAccent,
-              minimumSize: const Size(double.infinity, 50),
-            ),
-            child: const Text("로그 아웃", style: TextStyle(color: Colors.white)),
-          ),
-
-          const Divider(height: 10, color: Colors.white24),
-
-          // 대시보드 즐겨찾기 설정 ⭐
-          _buildDashboardSettingTile(context),
-
-          const Divider(height: 30, color: Colors.white24),
+          const Divider(height: 60, color: Colors.white24),
 
           _buildSectionTitle("구글 드라이브 백업 (SQLite)"),
           _isSyncing

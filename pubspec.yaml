@@ -2,7 +2,7 @@ name: etc
 description: "Emotion Trash Can"
 
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.0+4
 
 environment:
   sdk: '>=3.10.1 <4.0.0'
@@ -58,6 +58,7 @@ dependencies:
 
   flutter_localizations:
     sdk: flutter
+  shared_preferences: ^2.5.4
 
 dev_dependencies:
   flutter_test:

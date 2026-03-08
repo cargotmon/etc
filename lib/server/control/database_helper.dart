@@ -19,6 +19,7 @@ class DatabaseHelper {
 
     // 🔥 [임시 추가] 기존 DB 파일을 완전히 삭제해서 초기화를 강제함
     //await deleteDatabase(path);
+    //await db.execute("DROP TABLE IF EXISTS todos");
 
     return await openDatabase(
       path,
@@ -106,9 +107,19 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE todos (
         sn INTEGER PRIMARY KEY AUTOINCREMENT,
-        date TEXT NOT NULL,
-        content TEXT NOT NULL,
-        is_done INTEGER DEFAULT 0, -- 0: 미완료, 1: 완료
+        uuid TEXT NOT NULL UNIQUE,          -- 서버 동기화용 고유 키
+        userid TEXT NOT NULL,               -- 사용자 ID (gv.userId)
+        content TEXT NOT NULL,              -- 할 일 내용 (MariaDB의 todo)
+        is_done INTEGER DEFAULT 0,          -- 0: 미완료, 1: 완료 (MariaDB의 chk)
+        
+        date TEXT NOT NULL,                 -- 기준 날짜 (YYYY-MM-DD)
+        start_time TEXT,                    -- 시작 시간 (HH:mm)
+        end_time TEXT,                      -- 종료 시간 (HH:mm)
+        
+        priority INTEGER DEFAULT 0,         -- 우선순위 (MariaDB의 lev)
+        category TEXT DEFAULT '일반',        -- 그룹/카테고리 (MariaDB의 grp)
+        
+        done_dttm TEXT,                     -- 완료 처리된 실제 시각
         create_dttm TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     ''');

@@ -40,4 +40,8 @@ class SettingsService {
     }
   }
 
+  // 로그 아웃
+  Future<void> logOut() async {
+    await _driveService.handleSignOut();  //handleSignOut
+  }
 }

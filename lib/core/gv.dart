@@ -1,8 +1,9 @@
-// lib/core/gv.dart
 import '/server/control/database_helper.dart';
 
 class gv {
-  static String email = "입력";
+  static String email = "guest@gmail.com"; // 기본값
+
+  // 이메일에서 @ 앞부분만 추출하여 아이디로 사용
   static String get userId => email.contains('@') ? email.split('@')[0] : email;
 
   static bool doSaveServer = false;

@@ -1,4 +1,6 @@
+import 'package:etc/ui/screen/all_memo/all_memo_views.dart';
 import 'package:etc/ui/screen/chagebu/car_efficiency_view.dart';
+import 'package:etc/ui/screen/items/item_list_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -27,7 +29,7 @@ void main() async {
   }
 
   //
-  bool hasEmail = gv.email != "입력" && gv.email.isNotEmpty;
+  bool hasEmail = gv.email != "guest@gmail.com" && gv.email.isNotEmpty;
 
   runApp(MyDailyLogApp(hasEmail: hasEmail));
 }
@@ -73,8 +75,8 @@ class MyDailyLogApp extends StatelessWidget {
         '/settings': (context) => const SettingsScreen(isFirstTime: false),
         //'/daily_log': (context) => const DailyLogScreen(), // 바로 여기!
         '/car_view': (context) => const CarEfficiencyView(), // 나중에 차계부 파일 만들면 주석 해제
-        //'/memo_view': (context) => const MemoView(memo: '',),
-        //'/item_view': (context) => const ItemListScreen(),
+        '/memo_view': (context) => const AllMemoViews(userId: 'cargotmon@gmail.com', listUrl: '',),
+        '/item_view': (context) => const ItemListScreen(),
         //'/money_view': (context) => const MoneyDalView(),    // MoneyDalView
       },
 

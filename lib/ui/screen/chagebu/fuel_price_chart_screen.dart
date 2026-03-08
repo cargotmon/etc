@@ -22,7 +22,8 @@ class FuelPriceChartScreen extends StatefulWidget {
   State<FuelPriceChartScreen> createState() => _FuelPriceChartScreenState();
 }
 
-class _FuelPriceChartScreenState extends State<FuelPriceChartScreen> {
+class _FuelPriceChartScreenState extends State<FuelPriceChartScreen>
+{
   late ZoomPanBehavior _zoomPanBehavior;
 
   @override
